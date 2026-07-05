@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pipewire_controller import Node, PipeWireSnapshot
+from .pipewire_controller import Node, PipeWireSnapshot
 
 
 @dataclass(slots=True)
@@ -125,6 +125,7 @@ class RoutingStateManager:
             selected=self.selected_sources,
             available=self.available_sources,
             labels=self._source_labels,
+            force_all_selected=self.auto_capture,
         )
 
     def target_entries(self) -> list[ListEntry]:
@@ -132,6 +133,7 @@ class RoutingStateManager:
             selected=self.selected_targets,
             available=self.available_targets,
             labels=self._target_labels,
+            force_all_selected=self.auto_streaming,
         )
 
     def compute_actions(
@@ -203,6 +205,7 @@ class RoutingStateManager:
         selected: set[str],
         available: dict[str, Node],
         labels: dict[str, str],
+        force_all_selected: bool = False,
     ) -> list[ListEntry]:
         keys = set(available.keys()) | {k for k in selected if k not in available}
         def sort_key(key: str) -> tuple[int, str]:
@@ -220,13 +223,14 @@ class RoutingStateManager:
             is_active = bool(node is not None and (node.state or "").lower() == "running")
             base_label = labels.get(key, key)
             label = base_label if is_available else f"{base_label} (unavailable)"
+            is_selected = (force_all_selected and is_available) or (key in selected)
             entries.append(
                 ListEntry(
                     key=key,
                     label=label,
                     available=is_available,
                     active=is_active,
-                    selected=key in selected,
+                    selected=is_selected,
                 )
             )
         return entries

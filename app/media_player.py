@@ -10,7 +10,7 @@ from PyQt6.QtMultimedia import QAudioOutput, QMediaPlayer
 
 class MediaPlayerController:
     def __init__(self) -> None:
-        self._logger = logging.getLogger("audiolink.media")
+        self._logger = logging.getLogger("beamie.media")
         self._player: QMediaPlayer | None = None
         self._audio_output: QAudioOutput | None = None
         self._current_file: Path | None = None

@@ -9,9 +9,9 @@ from PyQt6.QtCore import QtMsgType, qInstallMessageHandler
 
 
 def configure_logging() -> Path:
-    log_dir = Path.home() / ".cache" / "audiolink"
+    log_dir = Path.home() / ".cache" / "beamie"
     log_dir.mkdir(parents=True, exist_ok=True)
-    log_file = log_dir / "audiolink.log"
+    log_file = log_dir / "beamie.log"
 
     root = logging.getLogger()
     root.setLevel(logging.DEBUG)
@@ -44,7 +44,7 @@ def install_global_hooks() -> None:
     import sys
     import traceback
 
-    logger = logging.getLogger("audiolink.hooks")
+    logger = logging.getLogger("beamie.hooks")
 
     def _excepthook(exc_type, exc_value, exc_tb):
         logger.error("Uncaught exception", exc_info=(exc_type, exc_value, exc_tb))

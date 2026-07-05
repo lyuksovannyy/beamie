@@ -6,7 +6,7 @@ import traceback
 from pathlib import Path
 
 from PyQt6.QtCore import QObject, QThread, QTimer, Qt, pyqtSignal, pyqtSlot
-from PyQt6.QtGui import QColor
+from PyQt6.QtGui import QColor, QIcon
 from PyQt6.QtWidgets import (
     QApplication,
     QAbstractItemView,
@@ -28,10 +28,118 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from media_player import MediaPlayerController
-from pipewire_controller import PipeWireController, PipeWireError, PipeWireSnapshot
-from state_manager import RouteAction, RoutingStateManager
-from app_config import AppConfig, load_config, save_config
+from ..media_player import MediaPlayerController
+from ..pipewire_controller import PipeWireController, PipeWireError, PipeWireSnapshot
+from ..state_manager import RouteAction, RoutingStateManager
+from ..app_config import AppConfig, load_config, save_config
+
+
+THEME = """
+    * {
+        font-family: "Segoe UI", "SF Pro Display", system-ui, sans-serif;
+    }
+    QMainWindow {
+        background-color: #0d1117;
+    }
+    QWidget#centralWidget {
+        background-color: #0d1117;
+    }
+    QGroupBox {
+        background-color: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 8px;
+        margin-top: 16px;
+        font-weight: bold;
+        color: #f2cc60;
+    }
+    QGroupBox::title {
+        subcontrol-origin: margin;
+        subcontrol-position: top left;
+        padding: 0 5px;
+        left: 10px;
+    }
+    QTreeWidget, QListWidget {
+        background-color: #0d1117;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        color: #e6edf3;
+        padding: 5px;
+    }
+    QTreeWidget::item, QListWidget::item {
+        padding: 4px;
+        border-radius: 4px;
+        color: #e6edf3;
+    }
+    QTreeWidget::item:hover, QListWidget::item:hover {
+        background-color: #21262d;
+    }
+    QTreeWidget::item:selected, QListWidget::item:selected {
+        background-color: #1f6feb;
+        color: #ffffff;
+    }
+    QPushButton {
+        background-color: #21262d;
+        color: #e6edf3;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        padding: 6px 12px;
+        font-weight: 600;
+    }
+    QPushButton:hover {
+        background-color: #30363d;
+        border-color: #8b949e;
+    }
+    QPushButton:pressed {
+        background-color: #161b22;
+    }
+    QSlider::groove:horizontal {
+        border: 1px solid #30363d;
+        height: 6px;
+        background: #161b22;
+        margin: 2px 0;
+        border-radius: 3px;
+    }
+    QSlider::handle:horizontal {
+        background: #1f6feb;
+        border: 1px solid #388bfd;
+        width: 14px;
+        height: 14px;
+        margin: -4px 0;
+        border-radius: 7px;
+    }
+    QSlider::handle:horizontal:hover {
+        background: #388bfd;
+    }
+    QSpinBox {
+        background-color: #161b22;
+        color: #e6edf3;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        padding: 3px;
+    }
+    QStatusBar {
+        background-color: #161b22;
+        color: #8b949e;
+        border-top: 1px solid #30363d;
+    }
+    QLabel {
+        color: #e6edf3;
+    }
+    QMenu {
+        background-color: #161b22;
+        color: #e6edf3;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+    }
+    QMenu::item {
+        padding: 6px 24px 6px 20px;
+        border-radius: 4px;
+    }
+    QMenu::item:selected {
+        background-color: #1f6feb;
+        color: #ffffff;
+    }
+"""
 
 
 class PipeWireWorker(QObject):
@@ -146,12 +254,12 @@ class MainWindow(QMainWindow):
     ITEM_KEY_ROLE = USER_ROLE + 5
     # Internal exclude lists: add exact node keys (node.name values) here.
     EXCLUDED_SOURCE_KEYS: list[str] = [
-        "input.audiolink_virtual_mic",
+        "input.beamie_virtual_mic",
         "gsr-default_input",
         "gsr-default_output",
     ]
     EXCLUDED_TARGET_KEYS: list[str] = [
-        "input.audiolink_virtual_mic",
+        "input.beamie_virtual_mic",
         "gsr-default_output",
     ]
 
@@ -164,7 +272,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self, controller: PipeWireController, media: MediaPlayerController) -> None:
         super().__init__()
-        self._logger = logging.getLogger("audiolink.ui")
+        self._logger = logging.getLogger("beamie.ui")
         self.controller = controller
         self.media = media
         self.state = RoutingStateManager()
@@ -175,15 +283,33 @@ class MainWindow(QMainWindow):
         self._virtual_mic_source_key = self.controller.virtual_mic_source_key()
         self._pending_virtual_mic_percent: float = 100.0
         self._cfg: AppConfig = load_config()
+        self.state.set_auto_capture(self._cfg.auto_capture)
+        self.state.set_auto_streaming(self._cfg.auto_streaming)
         self._auto_select_source_apps: set[str] = {
             self._normalize_source_app_marker(v) for v in self._cfg.auto_select_sources
         }
         self._auto_select_source_items: set[str] = set(self._cfg.auto_select_source_items)
         self._auto_select_target_names: set[str] = set(self._cfg.auto_select_targets)
 
-        self.setWindowTitle("AudioLink")
+        self.setWindowTitle("Beamie")
         self.resize(800, 600)
         self._logger.info("MainWindow initialized with size 800x600")
+
+        # Setup tray icon and logo/theme styling
+        import os
+        import sys
+        if getattr(sys, 'frozen', False):
+            project_root = getattr(sys, "_MEIPASS")
+        else:
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            
+        self.logo_path = os.path.join(project_root, "logo.ico")
+        if not os.path.exists(self.logo_path):
+            self.logo_path = os.path.join(project_root, "logo.png")
+            
+        self.logo_icon = QIcon(self.logo_path)
+        self.setWindowIcon(self.logo_icon)
+        self.setStyleSheet(THEME)
 
         self._build_ui()
         self._build_worker()
@@ -201,6 +327,13 @@ class MainWindow(QMainWindow):
         self._volume_timer.timeout.connect(self._flush_virtual_mic_percent)
 
     def closeEvent(self, event):  # type: ignore[override]
+        if hasattr(self, "_exiting") and self._exiting:
+            event.accept()
+            return
+        self.clean_exit()
+
+    def clean_exit(self) -> None:
+        self._exiting = True
         self._timer.stop()
         self._volume_timer.stop()
         self._save_config()
@@ -226,10 +359,11 @@ class MainWindow(QMainWindow):
 
         self._worker_thread.quit()
         self._worker_thread.wait(1500)
-        super().closeEvent(event)
+        QApplication.quit()
 
     def _build_ui(self) -> None:
         root = QWidget(self)
+        root.setObjectName("centralWidget")
         self.setCentralWidget(root)
         main_layout = QVBoxLayout(root)
 
@@ -313,6 +447,8 @@ class MainWindow(QMainWindow):
         self.volume_slider.valueChanged.connect(self._on_volume_slider_changed)
 
         self.toggle_streaming_btn.setChecked(True)
+        self.auto_capture_btn.setChecked(self.state.auto_capture)
+        self.auto_streaming_btn.setChecked(self.state.auto_streaming)
         self.setStatusBar(QStatusBar())
 
     def _build_worker(self) -> None:
@@ -654,17 +790,19 @@ class MainWindow(QMainWindow):
 
     def _toggle_auto_capture(self, enabled: bool) -> None:
         self.state.set_auto_capture(enabled)
+        self._save_config()
         self._refresh_lists()
         self._apply_routing_actions()
 
     def _toggle_auto_streaming(self, enabled: bool) -> None:
         self.state.set_auto_streaming(enabled)
+        self._save_config()
         self._refresh_lists()
         self._apply_routing_actions()
 
     def _set_streaming_indicator(self, enabled: bool) -> None:
         if enabled:
-            self.toggle_streaming_btn.setStyleSheet("background-color: #4caf50; color: white; font-weight: 600;")
+            self.toggle_streaming_btn.setStyleSheet("background-color: #238636; color: white; border-color: #2ea043;")
         else:
             self.toggle_streaming_btn.setStyleSheet("")
 
@@ -919,7 +1057,7 @@ class MainWindow(QMainWindow):
     def _show_error(self, message: str) -> None:
         self._logger.error(message)
         self.statusBar().showMessage(message, 7000)
-        QMessageBox.critical(self, "AudioLink", message)
+        QMessageBox.critical(self, "Beamie", message)
 
     def _show_status(self, message: str) -> None:
         self._logger.info(message)

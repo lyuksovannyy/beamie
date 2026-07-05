@@ -74,11 +74,11 @@ class PipeWireSnapshot:
 
 
 class PipeWireController:
-    VIRTUAL_MIC_SINK_NAME = "audiolink_virtual_mic_sink"
-    VIRTUAL_MIC_SOURCE_NAME = "audiolink_virtual_mic"
+    VIRTUAL_MIC_SINK_NAME = "beamie_virtual_mic_sink"
+    VIRTUAL_MIC_SOURCE_NAME = "beamie_virtual_mic"
 
     def __init__(self) -> None:
-        self._logger = logging.getLogger("audiolink.pipewire")
+        self._logger = logging.getLogger("beamie.pipewire")
         self._require_command("pw-dump")
         self._require_command("pw-link")
         self._require_command("pw-cli")
